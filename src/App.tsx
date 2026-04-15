@@ -1,12 +1,16 @@
 import { useEffect, useCallback } from 'react';
 import { useInventoryStore } from './store/inventoryStore';
-import { Navbar } from './components/Navbar';
+import { NavbarFixed } from './components/NavbarFixed';
 import { ScannerView } from './components/ScannerView';
 import { InventoryView } from './components/InventoryView';
 import { DashboardView } from './components/DashboardView';
 
 export default function App() {
   const { currentView, setView, loadProducts } = useInventoryStore();
+
+  useEffect(() => {
+    document.title = 'Emma Shop Inventario';
+  }, []);
 
   useEffect(() => {
     loadProducts();
@@ -40,7 +44,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Navbar />
+      <NavbarFixed />
       <main className="max-w-7xl mx-auto px-4 py-6">
         {currentView === 'scanner' && <ScannerView />}
         {currentView === 'inventory' && <InventoryView />}
