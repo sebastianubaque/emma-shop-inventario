@@ -433,7 +433,7 @@ export function InventoryView() {
 
                         {/* Actions */}
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-1.5 justify-end">
                             <button
                               onClick={() => setEditingProduct(product)}
                               className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-violet-100 hover:text-violet-600 flex items-center justify-center transition-colors"
