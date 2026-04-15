@@ -1,0 +1,51 @@
+import { useEffect, useCallback } from 'react';
+import { useInventoryStore } from './store/inventoryStore';
+import { Navbar } from './components/Navbar';
+import { ScannerView } from './components/ScannerView';
+import { InventoryView } from './components/InventoryView';
+import { DashboardView } from './components/DashboardView';
+
+export default function App() {
+  const { currentView, setView, loadProducts } = useInventoryStore();
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  // Global keyboard shortcuts
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      switch (e.key) {
+        case 'F1':
+          e.preventDefault();
+          setView('scanner');
+          break;
+        case 'F2':
+          e.preventDefault();
+          setView('inventory');
+          break;
+        case 'F3':
+          e.preventDefault();
+          setView('dashboard');
+          break;
+      }
+    },
+    [setView]
+  );
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <Navbar />
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {currentView === 'scanner' && <ScannerView />}
+        {currentView === 'inventory' && <InventoryView />}
+        {currentView === 'dashboard' && <DashboardView />}
+      </main>
+    </div>
+  );
+}
