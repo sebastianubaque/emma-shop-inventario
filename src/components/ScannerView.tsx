@@ -272,8 +272,8 @@ export function ScannerView() {
             <QrCode className="w-5 h-5 opacity-70" />
           </button>
 
-          {/* Manual entry + add product */}
-          <div className="mt-3 flex gap-2">
+          {/* Manual entry + action buttons */}
+          <div className="mt-3 flex flex-col gap-2">
             <input
               type="text"
               inputMode="numeric"
@@ -281,22 +281,24 @@ export function ScannerView() {
               onChange={(e) => setManualCode(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleManualSearch(); }}
               placeholder="Buscar por código manualmente..."
-              className="flex-1 px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm text-slate-900
-                focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all min-h-[44px]"
+              className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm text-slate-900
+                focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all min-h-11"
             />
-            <button
-              onClick={handleManualSearch}
-              className="px-4 py-2.5 bg-violet-600 text-white rounded-xl font-semibold text-sm hover:bg-violet-700 transition-colors min-h-[44px]"
-            >
-              Buscar
-            </button>
-            <button
-              onClick={() => setShowProductForm(true)}
-              className="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-200 transition-colors flex items-center gap-1.5 min-h-[44px]"
-            >
-              <PlusCircle className="w-4 h-4" />
-              Nuevo
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleManualSearch}
+                className="flex items-center justify-center px-4 py-2.5 bg-violet-600 text-white rounded-xl font-semibold text-sm hover:bg-violet-700 transition-colors min-h-11"
+              >
+                Buscar
+              </button>
+              <button
+                onClick={() => setShowProductForm(true)}
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-200 transition-colors min-h-11"
+              >
+                <PlusCircle className="w-4 h-4" />
+                Nuevo
+              </button>
+            </div>
           </div>
 
           {cameraError && (
