@@ -80,3 +80,23 @@ tbody tr {
 * {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Camera scanner animations */
+@keyframes scan-line {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(144px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes corner-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.animate-scan-line {
+  animation: scan-line 2.5s ease-in-out infinite;
+}
+
+.animate-corner-pulse {
+  animation: corner-pulse 1.5s ease-in-out infinite;
+}
