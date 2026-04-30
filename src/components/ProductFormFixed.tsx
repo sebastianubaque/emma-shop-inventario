@@ -118,9 +118,13 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !brand.trim() || !category.trim()) return;
-    if (variants.some((v) => !v.size.trim())) return;
 
-    const cleanVariants = variants.map((v) => ({ ...v, size: v.size.trim() }));
+    // Filter out empty-size variants; if none remain, treat as a single "Único" variant
+    const validVariants = variants.filter((v) => v.size.trim());
+    const cleanVariants = validVariants.length > 0
+      ? validVariants.map((v) => ({ ...v, size: v.size.trim() }))
+      : [{ size: 'Único', stock: variants[0]?.stock ?? 1 }];
+
     const stock = cleanVariants.reduce((s, v) => s + v.stock, 0);
     const primarySize = cleanVariants.length === 1 ? cleanVariants[0].size : undefined;
 
@@ -412,7 +416,7 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
             </button>
             <button
               type="submit"
-              disabled={!name.trim() || !brand.trim() || !category.trim() || variants.some((v) => !v.size.trim())}
+              disabled={!name.trim() || !brand.trim() || !category.trim()}
               className="flex-1 py-3 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-lg shadow-violet-200"
             >
               <Save className="w-5 h-5" />
