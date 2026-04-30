@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Package, Save, Percent } from 'lucide-react';
-import { Product, BABY_CATEGORIES } from '../types';
+import { X, Package, Save, Percent, Ruler, Wand2 } from 'lucide-react';
+import { Product, BABY_CATEGORIES, BABY_SIZES } from '../types';
 import { useInventoryStore } from '../store/inventoryStore';
 import { PriceInput } from './PriceInput';
 import { calcProfit, calcMargin, formatCOP, formatPercent } from '../utils/format';
@@ -18,10 +18,12 @@ interface ProductFormProps {
 export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel }: ProductFormProps) {
   const nameRef = useRef<HTMLInputElement>(null);
   const { products } = useInventoryStore();
+  const [autoBarcode, setAutoBarcode] = useState(false);
   const [barcode, setBarcode] = useState(editProduct?.barcode || initialBarcode || '');
   const [name, setName] = useState(editProduct?.name || '');
   const [brand, setBrand] = useState(editProduct?.brand || '');
   const [category, setCategory] = useState(editProduct?.category || '');
+  const [size, setSize] = useState(editProduct?.size || '');
   const [costPrice, setCostPrice] = useState(editProduct?.costPrice || 0);
   const [salePrice, setSalePrice] = useState(editProduct?.salePrice || 0);
   const [stock, setStock] = useState(editProduct?.stock || 1);
@@ -45,17 +47,46 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
       setCostPrice(Math.round(salePrice / (1 + pct / 100)));
     }
   };
-  const categoryOptions = useMemo(
+  const categoryOptions = useMemo(() => {
+    const counts = products.reduce<Record<string, number>>((acc, p) => {
+      const cat = p.category.trim();
+      if (cat) acc[cat] = (acc[cat] || 0) + 1;
+      return acc;
+    }, {});
+    const all = Array.from(
+      new Set([...BABY_CATEGORIES, ...Object.keys(counts)])
+    );
+    return all.sort((a, b) => ((counts[b] || 0) - (counts[a] || 0)) || a.localeCompare(b));
+  }, [products]);
+  const quickCategories = categoryOptions.slice(0, 8);
+
+  const brandOptions = useMemo(
     () =>
-      Array.from(
-        new Set([
-          ...BABY_CATEGORIES,
-          ...products.map((product) => product.category.trim()).filter(Boolean),
-        ])
-      ).sort((a, b) => a.localeCompare(b)),
+      Array.from(new Set(products.map((p) => p.brand.trim()).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b)
+      ),
     [products]
   );
-  const quickCategories = categoryOptions.slice(0, 8);
+  const quickBrands = brandOptions.slice(0, 8);
+
+  const generateBarcode = (currentName: string, currentBrand: string) => {
+    const date = new Date();
+    const datePart = `${String(date.getDate()).padStart(2, '0')}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getFullYear()).slice(2)}`;
+    const namePart = currentName.trim().slice(0, 4).toUpperCase().replace(/\s/g, '') || 'PROD';
+    const brandPart = currentBrand.trim().slice(0, 3).toUpperCase().replace(/\s/g, '') || 'MRC';
+    return `${datePart}${brandPart}${namePart}`;
+  };
+
+  const handleToggleAutoBarcode = () => {
+    const next = !autoBarcode;
+    setAutoBarcode(next);
+    if (next) setBarcode(generateBarcode(name, brand));
+    else setBarcode('');
+  };
+
+  useEffect(() => {
+    if (autoBarcode) setBarcode(generateBarcode(name, brand));
+  }, [autoBarcode, name, brand]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => nameRef.current?.focus(), 100);
@@ -71,6 +102,7 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
       name: name.trim(),
       brand: brand.trim(),
       category: category.trim(),
+      size: size.trim() || undefined,
       costPrice,
       salePrice,
       stock,
@@ -107,14 +139,33 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-semibold text-slate-700">Codigo de barras</label>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold text-slate-700">Código de barras</label>
+              <button
+                type="button"
+                onClick={handleToggleAutoBarcode}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  autoBarcode
+                    ? 'bg-violet-600 text-white shadow-sm shadow-violet-200'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                Generar automáticamente
+              </button>
+            </div>
             <input
               type="text"
               value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
-              placeholder="Escanea o escribe el codigo"
-              className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-slate-900 font-mono text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all bg-slate-50"
+              onChange={(e) => { if (!autoBarcode) setBarcode(e.target.value); }}
+              placeholder={autoBarcode ? 'Se generará al guardar' : 'Escanea o escribe el código'}
+              readOnly={autoBarcode}
+              className={`w-full px-3 py-2.5 border-2 rounded-xl text-slate-900 font-mono text-sm focus:outline-none transition-all ${
+                autoBarcode
+                  ? 'border-violet-300 bg-violet-50 text-violet-700 cursor-default'
+                  : 'border-slate-200 bg-slate-50 focus:border-violet-500 focus:ring-2 focus:ring-violet-100'
+              }`}
             />
           </div>
 
@@ -133,18 +184,44 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
             />
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-slate-700">
               Marca <span className="text-red-500">*</span>
             </label>
             <input
-              type="text"
+              list="product-brand-options"
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
               placeholder="Ej: Huggies, Fisher-Price, Carters..."
               required
-              className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all"
+              className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all bg-white"
             />
+            <datalist id="product-brand-options">
+              {brandOptions.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
+            {quickBrands.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {quickBrands.map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => setBrand(b)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                      brand === b
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                    }`}
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-slate-500">
+              Escribe la marca o selecciónala de las ya guardadas.
+            </p>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -183,6 +260,38 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
             <p className="text-xs text-slate-500">
               Puedes escribir una nueva categoria o tocar una sugerencia.
             </p>
+          </div>
+
+          {/* Size / Age selector */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+              <Ruler className="w-4 h-4 text-violet-500" />
+              Talla / Mes
+              <span className="text-xs font-normal text-slate-400 ml-1">(opcional)</span>
+            </label>
+            <input
+              type="text"
+              value={size}
+              onChange={(e) => setSize(e.target.value)}
+              placeholder="Ej: 3-6m, Talla 2, Único..."
+              className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all bg-white"
+            />
+            <div className="flex flex-wrap gap-2">
+              {BABY_SIZES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSize((prev) => (prev === s ? '' : s))}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                    size === s
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Margin selector */}

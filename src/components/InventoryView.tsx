@@ -85,6 +85,7 @@ export function InventoryView() {
       brand: p.brand,
       salePrice: p.salePrice,
       category: p.category,
+      size: p.size || '',
       barcode: p.barcode,
       stock: p.stock,
     })));
@@ -274,6 +275,7 @@ export function InventoryView() {
                       { key: 'name' as SortKey, label: 'Nombre' },
                       { key: 'brand' as SortKey, label: 'Marca' },
                       { key: 'category' as SortKey, label: 'Categoría' },
+                      { key: 'size' as SortKey, label: 'Talla' },
                       { key: 'costPrice' as SortKey, label: 'P. Costo' },
                       { key: 'salePrice' as SortKey, label: 'P. Venta' },
                       { key: 'stock' as SortKey, label: 'Stock' },
@@ -348,6 +350,17 @@ export function InventoryView() {
                           <span className="px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-xs font-semibold">
                             {product.category}
                           </span>
+                        </td>
+
+                        {/* Size */}
+                        <td className="px-4 py-3">
+                          {product.size ? (
+                            <span className="px-2 py-0.5 rounded-full bg-pink-50 text-pink-700 text-xs font-semibold">
+                              {product.size}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )}
                         </td>
 
                         {/* Cost Price */}

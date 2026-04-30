@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Scan, Package, TrendingUp, CheckCircle, PlusCircle, Zap, Camera, X, QrCode } from 'lucide-react';
+import { Scan, Package, TrendingUp, CheckCircle, PlusCircle, Zap, Camera, X, QrCode, Wand2, Plus, Minus } from 'lucide-react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { DecodeHintType, BarcodeFormat, NotFoundException } from '@zxing/library';
 import { useScannerInput } from '../hooks/useScanner';
@@ -182,6 +182,24 @@ export function ScannerView() {
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5);
 
+  // Productos con código automático: 6 dígitos de fecha + letras (ej: 300426CARBODY)
+  const AUTO_BARCODE_RE = /^\d{6}[A-Z]{3}.+/;
+  const autoCodeProducts = products.filter((p) => AUTO_BARCODE_RE.test(p.barcode));
+
+  const [showAutoPanel, setShowAutoPanel] = useState(false);
+  const [justAdded, setJustAdded] = useState<string | null>(null);
+
+  const handleQuickAddStock = useCallback(
+    async (productId: string) => {
+      const { incrementStock } = useInventoryStore.getState();
+      await incrementStock(productId);
+      playBeep('success');
+      setJustAdded(productId);
+      setTimeout(() => setJustAdded(null), 1200);
+    },
+    [playBeep]
+  );
+
   return (
     <>
       {/* Flash overlay */}
@@ -341,6 +359,63 @@ export function ScannerView() {
             <div className="text-xs text-slate-500 font-medium mt-0.5">Valor total</div>
           </div>
         </div>
+
+        {/* Auto-code products panel */}
+        {autoCodeProducts.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowAutoPanel((v) => !v)}
+              className="w-full px-5 py-3 flex items-center gap-3 hover:bg-slate-50 transition-colors"
+            >
+              <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
+                <Wand2 className="w-4 h-4 text-violet-600" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-bold text-slate-800">Productos sin código real</p>
+                <p className="text-xs text-slate-500">{autoCodeProducts.length} producto{autoCodeProducts.length !== 1 ? 's' : ''} con código automático · toca para agregar unidades</p>
+              </div>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full transition-colors ${showAutoPanel ? 'bg-violet-600 text-white' : 'bg-violet-100 text-violet-700'}`}>
+                {showAutoPanel ? 'Cerrar' : 'Ver'}
+              </span>
+            </button>
+
+            {showAutoPanel && (
+              <div className="border-t border-slate-100 divide-y divide-slate-50">
+                {autoCodeProducts.map((product) => {
+                  const added = justAdded === product.id;
+                  return (
+                    <div key={product.id} className={`px-5 py-3 flex items-center gap-3 transition-colors ${added ? 'bg-emerald-50' : ''}`}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{product.name}</p>
+                        <p className="text-xs text-slate-400 truncate">
+                          {product.brand}{product.size ? ` · ${product.size}` : ''} · {product.category}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-sm font-bold min-w-8 text-center transition-colors ${added ? 'text-emerald-600' : 'text-slate-700'}`}>
+                          {product.stock}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAddStock(product.id)}
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold transition-all active:scale-95 shadow-sm ${
+                            added
+                              ? 'bg-emerald-500 text-white shadow-emerald-200'
+                              : 'bg-violet-600 text-white hover:bg-violet-700 shadow-violet-200'
+                          }`}
+                          title="Agregar una unidad"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Recent Products */}
         {recentProducts.length > 0 && (

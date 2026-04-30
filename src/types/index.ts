@@ -4,6 +4,7 @@ export interface Product {
   name: string;
   brand: string;
   category: string;
+  size?: string;
   costPrice: number;
   salePrice: number;
   stock: number;
@@ -57,6 +58,10 @@ export interface PriceRange {
   range: string;
   count: number;
 }
+
+export const BABY_SIZES = [
+  'RN', '0-3m', '3-6m', '6-9m', '9-12m', '1A', '2A', '3A', '4A',
+] as const;
 
 export const BABY_CATEGORIES = [
   'Ropa bebé',
