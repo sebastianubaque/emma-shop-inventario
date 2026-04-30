@@ -43,13 +43,16 @@ export default function App() {
   }, [handleKeyDown]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <NavbarFixed />
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
         {currentView === 'scanner' && <ScannerView />}
         {currentView === 'inventory' && <InventoryView />}
         {currentView === 'dashboard' && <DashboardView />}
       </main>
+      <footer className="text-center py-3 text-xs text-slate-400 border-t border-slate-100 bg-white">
+        Emma Shop Inventario · versión 2.0
+      </footer>
     </div>
   );
 }
