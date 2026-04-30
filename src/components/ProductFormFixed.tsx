@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Package, Save } from 'lucide-react';
+import { X, Package, Save, Percent } from 'lucide-react';
 import { Product, BABY_CATEGORIES } from '../types';
 import { useInventoryStore } from '../store/inventoryStore';
 import { PriceInput } from './PriceInput';
 import { calcProfit, calcMargin, formatCOP, formatPercent } from '../utils/format';
+
+const MARGIN_OPTIONS = [20, 40, 50, 80];
+const DEFAULT_MARGIN = 40;
 
 interface ProductFormProps {
   initialBarcode?: string;
@@ -22,9 +25,26 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
   const [costPrice, setCostPrice] = useState(editProduct?.costPrice || 0);
   const [salePrice, setSalePrice] = useState(editProduct?.salePrice || 0);
   const [stock, setStock] = useState(editProduct?.stock || 1);
+  const [marginPct, setMarginPct] = useState(DEFAULT_MARGIN);
 
   const profit = calcProfit(salePrice, costPrice);
   const margin = calcMargin(salePrice, costPrice);
+
+  const handleSalePriceChange = (val: number) => {
+    setSalePrice(val);
+    if (val > 0) {
+      setCostPrice(Math.round(val / (1 + marginPct / 100)));
+    } else {
+      setCostPrice(0);
+    }
+  };
+
+  const handleMarginChange = (pct: number) => {
+    setMarginPct(pct);
+    if (salePrice > 0) {
+      setCostPrice(Math.round(salePrice / (1 + pct / 100)));
+    }
+  };
   const categoryOptions = useMemo(
     () =>
       Array.from(
@@ -165,21 +185,49 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
             </p>
           </div>
 
+          {/* Margin selector */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+              <Percent className="w-4 h-4 text-violet-500" />
+              Ganancia
+            </label>
+            <div className="flex gap-2">
+              {MARGIN_OPTIONS.map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => handleMarginChange(pct)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
+                    marginPct === pct
+                      ? 'bg-violet-600 text-white shadow-md shadow-violet-200'
+                      : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+                  }`}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Prices */}
           <div className="grid grid-cols-2 gap-3">
-            <PriceInput
-              id="cost-price"
-              label="Precio costo *"
-              value={costPrice}
-              onChange={setCostPrice}
-              placeholder="0"
-            />
             <PriceInput
               id="sale-price"
               label="Precio venta *"
               value={salePrice}
-              onChange={setSalePrice}
+              onChange={handleSalePriceChange}
               placeholder="0"
             />
+            <div>
+              <PriceInput
+                id="cost-price"
+                label="Precio costo"
+                value={costPrice}
+                onChange={setCostPrice}
+                placeholder="0"
+              />
+              <p className="text-xs text-slate-400 mt-1">Auto · {marginPct}% ganancia</p>
+            </div>
           </div>
 
           {costPrice > 0 && salePrice > 0 && (
