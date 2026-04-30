@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Product, ViewMode, FilterState } from '../types';
+import { Product, ProductVariant, ViewMode, FilterState, getTotalStock } from '../types';
 import {
   getAllProducts,
   saveProduct,
@@ -21,7 +21,6 @@ interface InventoryState {
   editingProduct: Product | null;
   filter: FilterState;
 
-  // Actions
   loadProducts: () => Promise<void>;
   setView: (view: ViewMode) => void;
   scanBarcode: (barcode: string) => Promise<'found' | 'new'>;
@@ -29,7 +28,10 @@ interface InventoryState {
   updateProduct: (id: string, data: Partial<Product>) => Promise<void>;
   removeProduct: (id: string) => Promise<void>;
   clearProducts: () => Promise<void>;
-  incrementStock: (id: string, amount?: number) => Promise<void>;
+  incrementStock: (id: string, amount?: number, variantSize?: string) => Promise<void>;
+  updateVariantStock: (id: string, variantSize: string, stock: number) => Promise<void>;
+  addVariant: (id: string, variant: ProductVariant) => Promise<void>;
+  removeVariant: (id: string, variantSize: string) => Promise<void>;
   setShowProductForm: (show: boolean) => void;
   setEditingProduct: (product: Product | null) => void;
   setScanFeedback: (feedback: 'idle' | 'found' | 'new' | 'updated') => void;
@@ -69,7 +71,6 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     set({ isLoading: true });
     try {
       let products = await getAllProducts();
-      // Seed demo data on first load
       if (products.length === 0 && !hasSeededDemoData()) {
         const demoProducts = createDemoProducts();
         await bulkSaveProducts(demoProducts);
@@ -87,8 +88,9 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   scanBarcode: async (barcode) => {
     const existing = await getProductByBarcode(barcode);
     if (existing) {
-      // Increment stock
-      await get().incrementStock(existing.id);
+      // Find which variant matches this barcode, if any
+      const variantSize = existing.variants?.find((v) => v.barcode === barcode)?.size;
+      await get().incrementStock(existing.id, 1, variantSize);
       set({ lastScannedBarcode: barcode, scanFeedback: 'updated' });
       return 'found';
     } else {
@@ -142,13 +144,85 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     });
   },
 
-  incrementStock: async (id, amount = 1) => {
+  incrementStock: async (id, amount = 1, variantSize?: string) => {
     const state = get();
     const existing = state.products.find((p) => p.id === id);
     if (!existing) return;
+
+    let updated: Product;
+
+    if (existing.variants && existing.variants.length > 0) {
+      const targetSize = variantSize ?? existing.variants[0].size;
+      const updatedVariants = existing.variants.map((v) =>
+        v.size === targetSize ? { ...v, stock: v.stock + amount } : v
+      );
+      updated = {
+        ...existing,
+        variants: updatedVariants,
+        stock: updatedVariants.reduce((s, v) => s + v.stock, 0),
+        updatedAt: new Date().toISOString(),
+      };
+    } else {
+      updated = {
+        ...existing,
+        stock: existing.stock + amount,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    await saveProduct(updated);
+    set((state) => ({
+      products: state.products.map((p) => (p.id === id ? updated : p)),
+    }));
+  },
+
+  updateVariantStock: async (id, variantSize, stock) => {
+    const state = get();
+    const existing = state.products.find((p) => p.id === id);
+    if (!existing || !existing.variants) return;
+    const updatedVariants = existing.variants.map((v) =>
+      v.size === variantSize ? { ...v, stock } : v
+    );
     const updated: Product = {
       ...existing,
-      stock: existing.stock + amount,
+      variants: updatedVariants,
+      stock: updatedVariants.reduce((s, v) => s + v.stock, 0),
+      updatedAt: new Date().toISOString(),
+    };
+    await saveProduct(updated);
+    set((state) => ({
+      products: state.products.map((p) => (p.id === id ? updated : p)),
+    }));
+  },
+
+  addVariant: async (id, variant) => {
+    const state = get();
+    const existing = state.products.find((p) => p.id === id);
+    if (!existing) return;
+    const currentVariants = existing.variants ?? [];
+    if (currentVariants.some((v) => v.size === variant.size)) return;
+    const updatedVariants = [...currentVariants, variant];
+    const updated: Product = {
+      ...existing,
+      variants: updatedVariants,
+      stock: updatedVariants.reduce((s, v) => s + v.stock, 0),
+      updatedAt: new Date().toISOString(),
+    };
+    await saveProduct(updated);
+    set((state) => ({
+      products: state.products.map((p) => (p.id === id ? updated : p)),
+    }));
+  },
+
+  removeVariant: async (id, variantSize) => {
+    const state = get();
+    const existing = state.products.find((p) => p.id === id);
+    if (!existing || !existing.variants || existing.variants.length <= 1) return;
+    const updatedVariants = existing.variants.filter((v) => v.size !== variantSize);
+    const updated: Product = {
+      ...existing,
+      variants: updatedVariants,
+      stock: updatedVariants.reduce((s, v) => s + v.stock, 0),
       updatedAt: new Date().toISOString(),
     };
     await saveProduct(updated);
@@ -158,13 +232,9 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   },
 
   setShowProductForm: (show) => set({ showProductForm: show }),
-
   setEditingProduct: (product) => set({ editingProduct: product }),
-
   setScanFeedback: (feedback) => set({ scanFeedback: feedback }),
-
   setFilter: (filter) =>
     set((state) => ({ filter: { ...state.filter, ...filter } })),
-
   resetFilter: () => set({ filter: defaultFilter }),
 }));

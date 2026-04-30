@@ -5,6 +5,7 @@ import { DecodeHintType, BarcodeFormat, NotFoundException } from '@zxing/library
 import { useScannerInput } from '../hooks/useScanner';
 import { useBeep } from '../hooks/useBeep';
 import { useInventoryStore } from '../store/inventoryStore';
+import { getTotalStock } from '../types';
 import { ProductFormFixed } from './ProductFormFixed';
 import { formatCOP } from '../utils/format';
 
@@ -348,13 +349,13 @@ export function ScannerView() {
           </div>
           <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm text-center">
             <div className="text-2xl font-bold text-emerald-600">
-              {products.reduce((s, p) => s + p.stock, 0)}
+              {products.reduce((s, p) => s + getTotalStock(p), 0)}
             </div>
             <div className="text-xs text-slate-500 font-medium mt-0.5">Unidades</div>
           </div>
           <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm text-center">
             <div className="text-lg font-bold text-blue-600">
-              ${formatCOP(products.reduce((s, p) => s + p.salePrice * p.stock, 0))}
+              ${formatCOP(products.reduce((s, p) => s + p.salePrice * getTotalStock(p), 0))}
             </div>
             <div className="text-xs text-slate-500 font-medium mt-0.5">Valor total</div>
           </div>
@@ -394,7 +395,7 @@ export function ScannerView() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className={`text-sm font-bold min-w-8 text-center transition-colors ${added ? 'text-emerald-600' : 'text-slate-700'}`}>
-                          {product.stock}
+                          {getTotalStock(product)}
                         </span>
                         <button
                           type="button"
@@ -437,7 +438,7 @@ export function ScannerView() {
                   <div className="text-right">
                     <p className="text-sm font-bold text-slate-900">${formatCOP(product.salePrice)}</p>
                     <p className="text-xs text-slate-400">
-                      Stock: <span className="font-semibold text-slate-600">{product.stock}</span>
+                      Stock: <span className="font-semibold text-slate-600">{getTotalStock(product)}</span>
                     </p>
                   </div>
                 </div>

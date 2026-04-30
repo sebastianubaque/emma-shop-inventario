@@ -7,6 +7,7 @@ import {
   TrendingUp, DollarSign, Package, Layers, AlertTriangle, Star, Award, Target
 } from 'lucide-react';
 import { useInventoryStore } from '../store/inventoryStore';
+import { getTotalStock } from '../types';
 import { formatCOP, calcProfit, calcMargin, formatPercent } from '../utils/format';
 
 const COLORS = ['#7c3aed', '#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#db2777', '#0891b2', '#65a30d', '#6366f1'];
@@ -60,12 +61,12 @@ export function DashboardView() {
   const { products } = useInventoryStore();
 
   const stats = useMemo(() => {
-    const totalCostValue = products.reduce((s, p) => s + p.costPrice * p.stock, 0);
-    const totalSaleValue = products.reduce((s, p) => s + p.salePrice * p.stock, 0);
+    const totalCostValue = products.reduce((s, p) => s + p.costPrice * getTotalStock(p), 0);
+    const totalSaleValue = products.reduce((s, p) => s + p.salePrice * getTotalStock(p), 0);
     const totalProfit = totalSaleValue - totalCostValue;
     const margins = products.filter(p => p.costPrice > 0).map(p => calcMargin(p.salePrice, p.costPrice));
     const avgMargin = margins.length > 0 ? margins.reduce((s, m) => s + m, 0) / margins.length : 0;
-    const totalStock = products.reduce((s, p) => s + p.stock, 0);
+    const totalStock = products.reduce((s, p) => s + getTotalStock(p), 0);
     return { totalCostValue, totalSaleValue, totalProfit, avgMargin, totalProducts: products.length, totalStock };
   }, [products]);
 
@@ -73,11 +74,12 @@ export function DashboardView() {
   const byCategory = useMemo(() => {
     const map: Record<string, { count: number; value: number; profit: number; stock: number }> = {};
     products.forEach((p) => {
+      const s = getTotalStock(p);
       if (!map[p.category]) map[p.category] = { count: 0, value: 0, profit: 0, stock: 0 };
       map[p.category].count += 1;
-      map[p.category].value += p.salePrice * p.stock;
-      map[p.category].profit += calcProfit(p.salePrice, p.costPrice) * p.stock;
-      map[p.category].stock += p.stock;
+      map[p.category].value += p.salePrice * s;
+      map[p.category].profit += calcProfit(p.salePrice, p.costPrice) * s;
+      map[p.category].stock += s;
     });
     return Object.entries(map)
       .map(([category, data]) => ({ category, ...data }))
@@ -88,11 +90,12 @@ export function DashboardView() {
   const byBrand = useMemo(() => {
     const map: Record<string, { count: number; value: number; profit: number; stock: number }> = {};
     products.forEach((p) => {
+      const s = getTotalStock(p);
       if (!map[p.brand]) map[p.brand] = { count: 0, value: 0, profit: 0, stock: 0 };
       map[p.brand].count += 1;
-      map[p.brand].value += p.salePrice * p.stock;
-      map[p.brand].profit += calcProfit(p.salePrice, p.costPrice) * p.stock;
-      map[p.brand].stock += p.stock;
+      map[p.brand].value += p.salePrice * s;
+      map[p.brand].profit += calcProfit(p.salePrice, p.costPrice) * s;
+      map[p.brand].stock += s;
     });
     return Object.entries(map)
       .map(([brand, data]) => ({ brand, ...data }))
@@ -118,7 +121,7 @@ export function DashboardView() {
   // Top by stock value
   const topByValue = useMemo(() =>
     [...products]
-      .map((p) => ({ ...p, stockValue: p.salePrice * p.stock }))
+      .map((p) => ({ ...p, stockValue: p.salePrice * getTotalStock(p) }))
       .sort((a, b) => b.stockValue - a.stockValue)
       .slice(0, 8),
     [products]
@@ -136,9 +139,9 @@ export function DashboardView() {
 
   // Insights
   const insights = useMemo(() => {
-    const highStock = products.filter((p) => p.stock > 20);
+    const highStock = products.filter((p) => getTotalStock(p) > 20);
     const lowMargin = products.filter((p) => p.costPrice > 0 && calcMargin(p.salePrice, p.costPrice) < 10);
-    const outOfStock = products.filter((p) => p.stock === 0);
+    const outOfStock = products.filter((p) => getTotalStock(p) === 0);
     const mostProfitable = [...products]
       .filter((p) => p.costPrice > 0)
       .sort((a, b) => calcMargin(b.salePrice, b.costPrice) - calcMargin(a.salePrice, a.costPrice))[0];

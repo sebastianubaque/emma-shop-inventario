@@ -17,12 +17,20 @@ let db: IDBPDatabase<BabyStoreDB> | null = null;
 
 export async function getDB(): Promise<IDBPDatabase<BabyStoreDB>> {
   if (db) return db;
-  db = await openDB<BabyStoreDB>('baby-store-inventory', 1, {
-    upgrade(database) {
-      const store = database.createObjectStore('products', { keyPath: 'id' });
-      store.createIndex('by-barcode', 'barcode', { unique: true });
-      store.createIndex('by-category', 'category', { unique: false });
-      store.createIndex('by-brand', 'brand', { unique: false });
+  db = await openDB<BabyStoreDB>('baby-store-inventory', 2, {
+    upgrade(database, oldVersion) {
+      if (oldVersion < 1) {
+        const store = database.createObjectStore('products', { keyPath: 'id' });
+        store.createIndex('by-barcode', 'barcode', { unique: false });
+        store.createIndex('by-category', 'category', { unique: false });
+        store.createIndex('by-brand', 'brand', { unique: false });
+      }
+      if (oldVersion === 1) {
+        // Migrate: drop unique constraint on by-barcode to support variant barcodes
+        const store = database.transaction.objectStore('products');
+        store.deleteIndex('by-barcode');
+        store.createIndex('by-barcode', 'barcode', { unique: false });
+      }
     },
   });
   return db;

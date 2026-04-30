@@ -1,3 +1,9 @@
+export interface ProductVariant {
+  size: string;
+  stock: number;
+  barcode?: string;
+}
+
 export interface Product {
   id: string;
   barcode: string;
@@ -8,8 +14,24 @@ export interface Product {
   costPrice: number;
   salePrice: number;
   stock: number;
+  variants?: ProductVariant[];
   createdAt: string;
   updatedAt: string;
+}
+
+export function getTotalStock(product: Product): number {
+  if (product.variants && product.variants.length > 0) {
+    return product.variants.reduce((sum, v) => sum + v.stock, 0);
+  }
+  return product.stock ?? 0;
+}
+
+export function getProductBarcode(product: Product): string {
+  return product.barcode || '';
+}
+
+export function hasVariants(product: Product): boolean {
+  return Array.isArray(product.variants) && product.variants.length > 0;
 }
 
 export type ProductFormData = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
