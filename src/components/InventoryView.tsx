@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   Search, Filter, Download, Trash2, Edit3, ChevronUp, ChevronDown,
-  Package, X, Check, SlidersHorizontal, RefreshCcw, ChevronRight, Layers,
+  Package, X, Check, SlidersHorizontal, RefreshCcw, ChevronRight, Layers, Printer,
 } from 'lucide-react';
 import { useInventoryStore } from '../store/inventoryStore';
 import { Product, getTotalStock } from '../types';
@@ -358,6 +358,17 @@ export function InventoryView() {
                           {/* Actions */}
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1.5 justify-end">
+                              <button
+                                onClick={() => updateProduct(product.id, { needsPrintedBarcode: !product.needsPrintedBarcode })}
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                                  product.needsPrintedBarcode
+                                    ? 'bg-amber-400 text-white'
+                                    : 'bg-slate-100 hover:bg-amber-100 hover:text-amber-600'
+                                }`}
+                                title={product.needsPrintedBarcode ? 'Marcado para imprimir · click para quitar' : 'Marcar para imprimir código'}
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
                               <button onClick={() => setEditingProduct(product)}
                                 className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-violet-100 hover:text-violet-600 flex items-center justify-center transition-colors" title="Editar">
                                 <Edit3 className="w-3.5 h-3.5" />

@@ -15,6 +15,7 @@ export interface Product {
   salePrice: number;
   stock: number;
   variants?: ProductVariant[];
+  needsPrintedBarcode?: boolean;
   createdAt: string;
   updatedAt: string;
 }

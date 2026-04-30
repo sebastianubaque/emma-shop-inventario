@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Package, Save, Percent, Ruler, Wand2, Plus, Trash2, Layers } from 'lucide-react';
+import { X, Package, Save, Percent, Ruler, Wand2, Plus, Trash2, Layers, Printer } from 'lucide-react';
 import { Product, ProductVariant, BABY_CATEGORIES, BABY_SIZES } from '../types';
 import { useInventoryStore } from '../store/inventoryStore';
 import { PriceInput } from './PriceInput';
@@ -20,6 +20,7 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
   const { products } = useInventoryStore();
 
   const [autoBarcode, setAutoBarcode] = useState(false);
+  const [needsPrintedBarcode, setNeedsPrintedBarcode] = useState(editProduct?.needsPrintedBarcode ?? false);
   const [barcode, setBarcode] = useState(editProduct?.barcode || initialBarcode || '');
   const [name, setName] = useState(editProduct?.name || '');
   const [brand, setBrand] = useState(editProduct?.brand || '');
@@ -133,6 +134,7 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
       salePrice,
       stock,
       variants: cleanVariants,
+      needsPrintedBarcode,
     });
   };
 
@@ -191,6 +193,18 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
                 autoBarcode ? 'border-violet-300 bg-violet-50 text-violet-700 cursor-default' : 'border-slate-200 bg-slate-50 focus:border-violet-500 focus:ring-2 focus:ring-violet-100'
               }`}
             />
+            <button
+              type="button"
+              onClick={() => setNeedsPrintedBarcode((v) => !v)}
+              className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
+                needsPrintedBarcode
+                  ? 'bg-amber-50 border-amber-400 text-amber-700 shadow-sm shadow-amber-100'
+                  : 'bg-white border-dashed border-slate-300 text-slate-500 hover:border-amber-300 hover:text-amber-600'
+              }`}
+            >
+              <Printer className="w-4 h-4" />
+              {needsPrintedBarcode ? 'Marcado para imprimir código ✓' : 'Crear código (marcar para imprimir)'}
+            </button>
           </div>
 
           {/* Name */}
