@@ -51,7 +51,7 @@ export default function App() {
         {currentView === 'dashboard' && <DashboardView />}
       </main>
       <footer className="text-center py-3 text-xs text-slate-400 border-t border-slate-100 bg-white">
-        Emma Shop Inventario · versión 2.1.1
+        Emma Shop Inventario · versión 2.2
       </footer>
     </div>
   );
