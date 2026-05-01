@@ -60,65 +60,41 @@ function buildProductRows(products: TreinteProduct[]): Record<string, string | n
   return rows;
 }
 
-function triggerDownload(buf: ArrayBuffer, filename: string): void {
-  const blob = new Blob([buf], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+function buildWorkbook(sheets: { name: string; rows: Record<string, string | number>[] }[]): XLSX.WorkBook {
+  const wb = XLSX.utils.book_new();
+  sheets.forEach((s) => {
+    const ws = XLSX.utils.json_to_sheet(s.rows.length > 0 ? s.rows : [{}]);
+    XLSX.utils.book_append_sheet(wb, ws, s.name);
   });
-  const nav = navigator as Navigator & { msSaveBlob?: (b: Blob, n: string) => void };
-  if (nav.msSaveBlob) { nav.msSaveBlob(blob, filename); return; }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  return wb;
 }
 
 // Used by DashboardView
 export function downloadXlsx(sheets: ExportSheet[], filename: string): void {
   const wb = XLSX.utils.book_new();
   sheets.forEach((s) => {
-    const ws = XLSX.utils.json_to_sheet(s.rows);
+    const ws = XLSX.utils.json_to_sheet(s.rows.length > 0 ? s.rows : [{}]);
     XLSX.utils.book_append_sheet(wb, ws, s.name);
   });
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
-  triggerDownload(buf, filename);
-}
-
-function downloadProductXlsx(
-  sheets: { name: string; products: TreinteProduct[] }[],
-  filename: string,
-): void {
-  const wb = XLSX.utils.book_new();
-  sheets.forEach((s) => {
-    const rows = buildProductRows(s.products);
-    const ws = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, s.name);
-  });
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
-  triggerDownload(buf, filename);
+  XLSX.writeFile(wb, filename);
 }
 
 export function downloadPrintPendingExcel(products: TreinteProduct[]): void {
   const date = new Date().toISOString().slice(0, 10);
-  downloadProductXlsx(
-    [{ name: 'Para Imprimir Codigo', products }],
-    `codigos-para-imprimir-${date}.xlsx`,
-  );
+  const wb = buildWorkbook([
+    { name: 'Para Imprimir Codigo', rows: buildProductRows(products) },
+  ]);
+  XLSX.writeFile(wb, `codigos-para-imprimir-${date}.xlsx`);
 }
 
 export function downloadTreinteExcel(products: TreinteProduct[]): void {
   const withCode = products.filter((p) => p.needsPrintedBarcode === true);
   const withoutCode = products.filter((p) => p.needsPrintedBarcode !== true);
   const date = new Date().toISOString().slice(0, 10);
-  downloadProductXlsx(
-    [
-      { name: 'Codigos Generados', products: withCode },
-      { name: 'Pendientes de Codigo', products: withoutCode },
-      { name: 'Base Completa Treinta', products: [...withCode, ...withoutCode] },
-    ],
-    `treinta-inventario-${date}.xlsx`,
-  );
+  const wb = buildWorkbook([
+    { name: 'Codigos Generados', rows: buildProductRows(withCode) },
+    { name: 'Pendientes de Codigo', rows: buildProductRows(withoutCode) },
+    { name: 'Base Completa Treinta', rows: buildProductRows([...withCode, ...withoutCode]) },
+  ]);
+  XLSX.writeFile(wb, `treinta-inventario-${date}.xlsx`);
 }
