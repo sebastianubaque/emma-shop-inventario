@@ -289,11 +289,27 @@ export function downloadXlsx(sheets: ExportSheet[], filename: string): void {
   });
 
   const zipData = writeZip(zipFiles);
-  const blob = new Blob([zipData.buffer.slice(0) as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const blob = new Blob(
+    [zipData.buffer.slice(zipData.byteOffset, zipData.byteOffset + zipData.byteLength)],
+    { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+  );
+
+  // msSaveBlob for legacy Edge/IE; standard approach for everything else
+  const nav = navigator as Navigator & { msSaveBlob?: (b: Blob, n: string) => void };
+  if (nav.msSaveBlob) {
+    nav.msSaveBlob(blob, filename);
+    return;
+  }
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
 }
