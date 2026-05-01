@@ -15,16 +15,22 @@ interface ProductFormProps {
   onCancel: () => void;
 }
 
+const LAST_BRAND_KEY = 'pf_last_brand';
+const LAST_CATEGORY_KEY = 'pf_last_category';
+const LAST_NAME_KEY = 'pf_last_name';
+
 export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel }: ProductFormProps) {
   const nameRef = useRef<HTMLInputElement>(null);
   const { products } = useInventoryStore();
 
+  const isNew = !editProduct;
+
   const [autoBarcode, setAutoBarcode] = useState(false);
   const [needsPrintedBarcode, setNeedsPrintedBarcode] = useState(editProduct?.needsPrintedBarcode ?? false);
   const [barcode, setBarcode] = useState(editProduct?.barcode || initialBarcode || '');
-  const [name, setName] = useState(editProduct?.name || '');
-  const [brand, setBrand] = useState(editProduct?.brand || '');
-  const [category, setCategory] = useState(editProduct?.category || '');
+  const [name, setName] = useState(editProduct?.name || (isNew ? (localStorage.getItem(LAST_NAME_KEY) ?? '') : ''));
+  const [brand, setBrand] = useState(editProduct?.brand || (isNew ? (localStorage.getItem(LAST_BRAND_KEY) ?? '') : ''));
+  const [category, setCategory] = useState(editProduct?.category || (isNew ? (localStorage.getItem(LAST_CATEGORY_KEY) ?? '') : ''));
   const [costPrice, setCostPrice] = useState(editProduct?.costPrice || 0);
   const [salePrice, setSalePrice] = useState(editProduct?.salePrice || 0);
   const [marginPct, setMarginPct] = useState(DEFAULT_MARGIN);
@@ -84,8 +90,12 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
   const handleToggleAutoBarcode = () => {
     const next = !autoBarcode;
     setAutoBarcode(next);
-    if (next) setBarcode(generateBarcode(name, brand));
-    else setBarcode('');
+    if (next) {
+      setBarcode(generateBarcode(name, brand));
+      setNeedsPrintedBarcode(true);
+    } else {
+      setBarcode('');
+    }
   };
 
   useEffect(() => {
@@ -111,13 +121,19 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
     const trimmed = size.trim();
     if (!trimmed) return;
     if (variants.some((v) => v.size === trimmed)) return;
-    setVariants((prev) => [...prev, { size: trimmed, stock: 0 }]);
+    setVariants((prev) => [...prev, { size: trimmed, stock: 1 }]);
     setNewVariantSize('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !brand.trim() || !category.trim()) return;
+
+    if (isNew) {
+      localStorage.setItem(LAST_NAME_KEY, name.trim());
+      localStorage.setItem(LAST_BRAND_KEY, brand.trim());
+      localStorage.setItem(LAST_CATEGORY_KEY, category.trim());
+    }
 
     // Filter out empty-size variants; if none remain, treat as a single "Único" variant
     const validVariants = variants.filter((v) => v.size.trim());
@@ -216,15 +232,22 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
             <label className="text-sm font-semibold text-slate-700">
               Nombre del producto <span className="text-red-500">*</span>
             </label>
-            <input
-              ref={nameRef}
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ej: Body manga larga estampado"
-              required
-              className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all"
-            />
+            <div className="relative">
+              <input
+                ref={nameRef}
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ej: Body manga larga estampado"
+                required
+                className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all pr-8"
+              />
+              {name && (
+                <button type="button" onClick={() => setName('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Brand */}
@@ -232,14 +255,21 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
             <label className="text-sm font-semibold text-slate-700">
               Marca <span className="text-red-500">*</span>
             </label>
-            <input
-              list="product-brand-options"
-              value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-              placeholder="Ej: Huggies, Fisher-Price, Carters..."
-              required
-              className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all bg-white"
-            />
+            <div className="relative">
+              <input
+                list="product-brand-options"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder="Ej: Huggies, Fisher-Price, Carters..."
+                required
+                className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all bg-white pr-8"
+              />
+              {brand && (
+                <button type="button" onClick={() => setBrand('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             <datalist id="product-brand-options">
               {brandOptions.map((b) => <option key={b} value={b} />)}
             </datalist>
@@ -260,14 +290,21 @@ export function ProductFormFixed({ initialBarcode, editProduct, onSave, onCancel
             <label className="text-sm font-semibold text-slate-700">
               Categoría <span className="text-red-500">*</span>
             </label>
-            <input
-              list="product-category-options"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="Escribe o elige una categoría"
-              required
-              className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all bg-white"
-            />
+            <div className="relative">
+              <input
+                list="product-category-options"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="Escribe o elige una categoría"
+                required
+                className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 transition-all bg-white pr-8"
+              />
+              {category && (
+                <button type="button" onClick={() => setCategory('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             <datalist id="product-category-options">
               {categoryOptions.map((cat) => <option key={cat} value={cat} />)}
             </datalist>

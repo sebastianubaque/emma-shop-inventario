@@ -1,14 +1,15 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
 import {
-  TrendingUp, DollarSign, Package, Layers, AlertTriangle, Star, Award, Target
+  TrendingUp, DollarSign, Package, Layers, AlertTriangle, Star, Award, Target, FileSpreadsheet
 } from 'lucide-react';
 import { useInventoryStore } from '../store/inventoryStore';
 import { getTotalStock } from '../types';
 import { formatCOP, calcProfit, calcMargin, formatPercent } from '../utils/format';
+import { downloadXlsx } from '../utils/exportXlsx';
 
 const COLORS = ['#7c3aed', '#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#db2777', '#0891b2', '#65a30d', '#6366f1'];
 
@@ -150,6 +151,86 @@ export function DashboardView() {
     return { highStock, lowMargin, outOfStock, mostProfitable, richestCategory, richestBrand };
   }, [products, byCategory, byBrand]);
 
+  const exportToExcel = useCallback(() => {
+    // Sheet 1: Inventario completo (una fila por variante)
+    const inventoryRows: Record<string, string | number>[] = [];
+    products.forEach((p) => {
+      const hasV = p.variants && p.variants.length > 0;
+      if (hasV) {
+        p.variants!.forEach((v) => {
+          inventoryRows.push({
+            'Código': p.barcode,
+            'Nombre': p.name,
+            'Marca': p.brand,
+            'Categoría': p.category,
+            'Talla': v.size,
+            'Stock': v.stock,
+            'Precio Costo': p.costPrice,
+            'Precio Venta': p.salePrice,
+            'Ganancia Unit.': calcProfit(p.salePrice, p.costPrice),
+            'Margen %': Math.round(calcMargin(p.salePrice, p.costPrice) * 10) / 10,
+            'Valor Stock (venta)': p.salePrice * v.stock,
+            'Imprimir Código': p.needsPrintedBarcode ? 'Sí' : 'No',
+            'Fecha Alta': new Date(p.createdAt).toLocaleDateString('es-CO'),
+          });
+        });
+      } else {
+        inventoryRows.push({
+          'Código': p.barcode,
+          'Nombre': p.name,
+          'Marca': p.brand,
+          'Categoría': p.category,
+          'Talla': p.size || 'Único',
+          'Stock': getTotalStock(p),
+          'Precio Costo': p.costPrice,
+          'Precio Venta': p.salePrice,
+          'Ganancia Unit.': calcProfit(p.salePrice, p.costPrice),
+          'Margen %': Math.round(calcMargin(p.salePrice, p.costPrice) * 10) / 10,
+          'Valor Stock (venta)': p.salePrice * getTotalStock(p),
+          'Imprimir Código': p.needsPrintedBarcode ? 'Sí' : 'No',
+          'Fecha Alta': new Date(p.createdAt).toLocaleDateString('es-CO'),
+        });
+      }
+    });
+
+    // Sheet 2: Resumen por categoría
+    const catRows = byCategory.map((c) => ({
+      'Categoría': c.category,
+      'Productos': c.count,
+      'Stock Total': c.stock,
+      'Valor Venta': c.value,
+      'Ganancia': c.profit,
+    }));
+
+    // Sheet 3: Resumen por marca
+    const brandRows = [...products.reduce<Map<string, { count: number; stock: number; value: number; profit: number }>>((m, p) => {
+      const s = getTotalStock(p);
+      const entry = m.get(p.brand) ?? { count: 0, stock: 0, value: 0, profit: 0 };
+      entry.count += 1;
+      entry.stock += s;
+      entry.value += p.salePrice * s;
+      entry.profit += calcProfit(p.salePrice, p.costPrice) * s;
+      m.set(p.brand, entry);
+      return m;
+    }, new Map()).entries()].sort((a, b) => b[1].value - a[1].value).map(([brand, d]) => ({
+      'Marca': brand,
+      'Productos': d.count,
+      'Stock Total': d.stock,
+      'Valor Venta': d.value,
+      'Ganancia': d.profit,
+    }));
+
+    const date = new Date().toISOString().slice(0, 10);
+    downloadXlsx(
+      [
+        { name: 'Inventario', rows: inventoryRows },
+        { name: 'Por Categoría', rows: catRows },
+        { name: 'Por Marca', rows: brandRows },
+      ],
+      `inventario-emma-${date}.xlsx`,
+    );
+  }, [products, byCategory]);
+
   if (products.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -166,6 +247,18 @@ export function DashboardView() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Export button */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={exportToExcel}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 active:scale-[0.98] transition-all shadow-md shadow-emerald-200"
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Exportar a Excel
+        </button>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatCard
