@@ -1,11 +1,12 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   Search, Filter, Download, Trash2, Edit3, ChevronUp, ChevronDown,
-  Package, X, Check, SlidersHorizontal, RefreshCcw, ChevronRight, Layers, Printer,
+  Package, X, Check, SlidersHorizontal, RefreshCcw, ChevronRight, Layers, Printer, FileSpreadsheet,
 } from 'lucide-react';
 import { useInventoryStore } from '../store/inventoryStore';
 import { Product, getTotalStock } from '../types';
 import { formatCOP, calcProfit, calcMargin, formatPercent, exportToCSV, downloadFile } from '../utils/format';
+import { downloadPrintPendingExcel } from '../utils/exportXlsx';
 import { ProductFormFixed } from './ProductFormFixed';
 import { PriceInput } from './PriceInput';
 
@@ -107,6 +108,12 @@ export function InventoryView() {
     setTimeout(() => setClearAllConfirm(false), 4000);
   };
 
+  const printPending = useMemo(() => products.filter((p) => p.needsPrintedBarcode === true), [products]);
+
+  const handleExportPrintPending = () => {
+    downloadPrintPendingExcel(printPending);
+  };
+
   const activeFilters = (filter.search ? 1 : 0) + (filter.category ? 1 : 0) + (filter.brand ? 1 : 0);
   const totalStock = filtered.reduce((s, p) => s + getTotalStock(p), 0);
   const totalValue = filtered.reduce((s, p) => s + p.salePrice * getTotalStock(p), 0);
@@ -147,6 +154,21 @@ export function InventoryView() {
 
           <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 transition-colors shadow-sm">
             <Download className="w-4 h-4" /> Exportar CSV
+          </button>
+
+          <button
+            onClick={handleExportPrintPending}
+            disabled={printPending.length === 0}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-sm hover:bg-amber-600 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Descargar Excel con los productos marcados para imprimir código"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <Printer className="w-4 h-4" />
+            {printPending.length > 0 && (
+              <span className="bg-white text-amber-600 text-xs font-black px-1.5 py-0.5 rounded-full leading-none">
+                {printPending.length}
+              </span>
+            )}
           </button>
 
           <button onClick={handleClearAll} disabled={products.length === 0}

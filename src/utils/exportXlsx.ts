@@ -241,6 +241,15 @@ function emptyHeaderRow(): SheetData {
   return [Object.fromEntries(PRODUCT_HEADERS.map((h) => [h, null]))];
 }
 
+export function downloadPrintPendingExcel(products: TreinteProduct[]): void {
+  const date = new Date().toISOString().slice(0, 10);
+  const rows = buildProductRows(products);
+  downloadXlsx(
+    [{ name: 'Para Imprimir Código', rows: rows.length > 0 ? rows : emptyHeaderRow() }],
+    `codigos-para-imprimir-${date}.xlsx`,
+  );
+}
+
 export function downloadTreinteExcel(products: TreinteProduct[]): void {
   const withCode = products.filter((p) => p.needsPrintedBarcode === true);
   const withoutCode = products.filter((p) => p.needsPrintedBarcode !== true);
