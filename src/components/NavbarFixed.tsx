@@ -1,7 +1,7 @@
-import { Scan, List, BarChart2, Download } from 'lucide-react';
+import { Scan, List, BarChart2, FileSpreadsheet } from 'lucide-react';
 import { useInventoryStore } from '../store/inventoryStore';
 import { ViewMode } from '../types';
-import { exportToCSV, downloadFile } from '../utils/format';
+import { downloadTreinteExcel } from '../utils/exportXlsx';
 import logoEmmaWhite from '../assets/logo-emma-icon-white.png';
 
 const NAV_ITEMS: { view: ViewMode; label: string; icon: React.ReactNode; shortcut: string }[] = [
@@ -14,15 +14,7 @@ export function NavbarFixed() {
   const { currentView, setView, products } = useInventoryStore();
 
   const handleExport = () => {
-    const csv = exportToCSV(products.map((p) => ({
-      name: p.name,
-      brand: p.brand,
-      salePrice: p.salePrice,
-      category: p.category,
-      barcode: p.barcode,
-      stock: p.stock,
-    })));
-    downloadFile(csv, `inventario-bebes-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;');
+    downloadTreinteExcel(products);
   };
 
   return (
@@ -74,9 +66,9 @@ export function NavbarFixed() {
             onClick={handleExport}
             disabled={products.length === 0}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
-            title="Exportar CSV para Treinta"
+            title="Exportar Excel para Treinta (3 hojas)"
           >
-            <Download className="w-4 h-4" />
+            <FileSpreadsheet className="w-4 h-4" />
             <span className="hidden sm:inline">Treinta</span>
           </button>
         </div>

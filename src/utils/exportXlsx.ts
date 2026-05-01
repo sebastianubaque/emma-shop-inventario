@@ -177,6 +177,85 @@ export interface ExportSheet {
   rows: SheetData;
 }
 
+export interface TreinteProduct {
+  id: string;
+  barcode: string;
+  name: string;
+  brand: string;
+  category: string;
+  size?: string;
+  costPrice: number;
+  salePrice: number;
+  stock: number;
+  variants?: { size: string; stock: number; barcode?: string }[];
+  needsPrintedBarcode?: boolean;
+  createdAt: string;
+}
+
+function getTotalStockLocal(p: TreinteProduct): number {
+  if (p.variants && p.variants.length > 0) return p.variants.reduce((s, v) => s + v.stock, 0);
+  return p.stock ?? 0;
+}
+
+function buildProductRows(products: TreinteProduct[]): SheetData {
+  const rows: SheetData = [];
+  products.forEach((p) => {
+    const hasV = p.variants && p.variants.length > 0;
+    if (hasV) {
+      p.variants!.forEach((v) => {
+        rows.push({
+          'Código': p.barcode,
+          'Nombre': p.name,
+          'Marca': p.brand,
+          'Categoría': p.category,
+          'Talla': v.size,
+          'Stock': v.stock,
+          'Precio Costo': p.costPrice,
+          'Precio Venta': p.salePrice,
+          'Fecha Alta': new Date(p.createdAt).toLocaleDateString('es-CO'),
+        });
+      });
+    } else {
+      rows.push({
+        'Código': p.barcode,
+        'Nombre': p.name,
+        'Marca': p.brand,
+        'Categoría': p.category,
+        'Talla': p.size || 'Único',
+        'Stock': getTotalStockLocal(p),
+        'Precio Costo': p.costPrice,
+        'Precio Venta': p.salePrice,
+        'Fecha Alta': new Date(p.createdAt).toLocaleDateString('es-CO'),
+      });
+    }
+  });
+  return rows;
+}
+
+export function downloadTreinteExcel(products: TreinteProduct[]): void {
+  const withCode = products.filter((p) => p.needsPrintedBarcode === true);
+  const withoutCode = products.filter((p) => p.needsPrintedBarcode !== true);
+
+  const date = new Date().toISOString().slice(0, 10);
+  downloadXlsx(
+    [
+      {
+        name: 'Códigos Generados',
+        rows: buildProductRows(withCode),
+      },
+      {
+        name: 'Pendientes de Código',
+        rows: buildProductRows(withoutCode),
+      },
+      {
+        name: 'Base Completa (Treinta)',
+        rows: buildProductRows([...withCode, ...withoutCode]),
+      },
+    ],
+    `treinta-inventario-${date}.xlsx`,
+  );
+}
+
 export function downloadXlsx(sheets: ExportSheet[], filename: string): void {
   const zipFiles: { name: string; data: Uint8Array }[] = [];
 
