@@ -232,25 +232,31 @@ function buildProductRows(products: TreinteProduct[]): SheetData {
   return rows;
 }
 
+const PRODUCT_HEADERS = [
+  'Código', 'Nombre', 'Marca', 'Categoría', 'Talla',
+  'Stock', 'Precio Costo', 'Precio Venta', 'Fecha Alta',
+];
+
+function emptyHeaderRow(): SheetData {
+  return [Object.fromEntries(PRODUCT_HEADERS.map((h) => [h, null]))];
+}
+
 export function downloadTreinteExcel(products: TreinteProduct[]): void {
   const withCode = products.filter((p) => p.needsPrintedBarcode === true);
   const withoutCode = products.filter((p) => p.needsPrintedBarcode !== true);
+  const all = [...withCode, ...withoutCode];
+
+  const toRows = (list: TreinteProduct[]) => {
+    const rows = buildProductRows(list);
+    return rows.length > 0 ? rows : emptyHeaderRow();
+  };
 
   const date = new Date().toISOString().slice(0, 10);
   downloadXlsx(
     [
-      {
-        name: 'Códigos Generados',
-        rows: buildProductRows(withCode),
-      },
-      {
-        name: 'Pendientes de Código',
-        rows: buildProductRows(withoutCode),
-      },
-      {
-        name: 'Base Completa (Treinta)',
-        rows: buildProductRows([...withCode, ...withoutCode]),
-      },
+      { name: 'Códigos Generados', rows: toRows(withCode) },
+      { name: 'Pendientes de Código', rows: toRows(withoutCode) },
+      { name: 'Base Completa (Treinta)', rows: toRows(all) },
     ],
     `treinta-inventario-${date}.xlsx`,
   );
