@@ -26,12 +26,10 @@ function colName(idx: number): string {
 
 function buildSheetXml(rows: SheetData, headers: string[]): string {
   const cells: string[] = [];
-  // Header row
   headers.forEach((h, ci) => {
     const addr = `${colName(ci)}1`;
     cells.push(`<c r="${addr}" t="inlineStr"><is><t>${escapeXml(h)}</t></is></c>`);
   });
-  // Data rows
   rows.forEach((row, ri) => {
     headers.forEach((h, ci) => {
       const val = row[h];
@@ -78,7 +76,6 @@ const ROOT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`
   + `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>`
   + `</Relationships>`;
 
-// Minimal ZIP writer (store compression — no deflate needed for small files)
 function u8(str: string): Uint8Array {
   return new TextEncoder().encode(str);
 }
@@ -101,81 +98,95 @@ function le32(n: number): number[] {
 }
 
 function writeZip(files: { name: string; data: Uint8Array }[]): Uint8Array {
-  const localHeaders: number[] = [];
+  const localParts: number[] = [];
   const centralDirs: number[] = [];
   const offsets: number[] = [];
 
   for (const file of files) {
-    offsets.push(localHeaders.length);
+    offsets.push(localParts.length);
     const nameBytes = Array.from(u8(file.name));
     const crc = crc32(file.data);
     const size = file.data.length;
 
-    // Local file header
-    localHeaders.push(
-      0x50, 0x4b, 0x03, 0x04, // signature
-      0x14, 0x00,             // version needed
-      0x00, 0x00,             // flags
-      0x00, 0x00,             // compression (store)
-      0x00, 0x00,             // mod time
-      0x00, 0x00,             // mod date
-      ...le32(crc),
-      ...le32(size),
-      ...le32(size),
-      ...le16(nameBytes.length),
-      0x00, 0x00,             // extra length
+    localParts.push(
+      0x50, 0x4b, 0x03, 0x04,
+      0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      ...le32(crc), ...le32(size), ...le32(size),
+      ...le16(nameBytes.length), 0x00, 0x00,
       ...nameBytes,
     );
-    localHeaders.push(...Array.from(file.data));
+    localParts.push(...Array.from(file.data));
 
-    // Central directory entry
     centralDirs.push(
-      0x50, 0x4b, 0x01, 0x02, // signature
-      0x14, 0x00,             // version made by
-      0x14, 0x00,             // version needed
-      0x00, 0x00,             // flags
-      0x00, 0x00,             // compression
-      0x00, 0x00,             // mod time
-      0x00, 0x00,             // mod date
-      ...le32(crc),
-      ...le32(size),
-      ...le32(size),
+      0x50, 0x4b, 0x01, 0x02,
+      0x14, 0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      ...le32(crc), ...le32(size), ...le32(size),
       ...le16(nameBytes.length),
-      0x00, 0x00,             // extra length
-      0x00, 0x00,             // comment length
-      0x00, 0x00,             // disk start
-      0x00, 0x00,             // internal attrs
-      0x00, 0x00, 0x00, 0x00, // external attrs
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       ...le32(offsets[offsets.length - 1]),
       ...nameBytes,
     );
   }
 
-  const cdOffset = localHeaders.length;
+  const cdOffset = localParts.length;
   const cdSize = centralDirs.length;
-
   const eocd = [
-    0x50, 0x4b, 0x05, 0x06, // signature
-    0x00, 0x00,             // disk number
-    0x00, 0x00,             // disk with CD
-    ...le16(files.length),
-    ...le16(files.length),
-    ...le32(cdSize),
-    ...le32(cdOffset),
-    0x00, 0x00,             // comment length
+    0x50, 0x4b, 0x05, 0x06,
+    0x00, 0x00, 0x00, 0x00,
+    ...le16(files.length), ...le16(files.length),
+    ...le32(cdSize), ...le32(cdOffset),
+    0x00, 0x00,
   ];
 
-  const all = new Uint8Array(localHeaders.length + centralDirs.length + eocd.length);
-  all.set(localHeaders);
-  all.set(centralDirs, localHeaders.length);
-  all.set(eocd, localHeaders.length + centralDirs.length);
+  const all = new Uint8Array(localParts.length + centralDirs.length + eocd.length);
+  all.set(localParts);
+  all.set(centralDirs, localParts.length);
+  all.set(eocd, localParts.length + centralDirs.length);
   return all;
+}
+
+function triggerDownload(data: Uint8Array, filename: string): void {
+  const blob = new Blob(
+    [data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)],
+    { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+  );
+  const nav = navigator as Navigator & { msSaveBlob?: (b: Blob, n: string) => void };
+  if (nav.msSaveBlob) { nav.msSaveBlob(blob, filename); return; }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
 }
 
 export interface ExportSheet {
   name: string;
   rows: SheetData;
 }
+
+// Used by DashboardView — infers headers from first row keys
+export function downloadXlsx(sheets: ExportSheet[], filename: string): void {
+  const zipFiles: { name: string; data: Uint8Array }[] = [];
+  let contentTypes = CONTENT_TYPES_START;
+  sheets.forEach((_, i) => {
+    contentTypes += `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`;
+  });
+  contentTypes += `</Types>`;
+  zipFiles.push({ name: '[Content_Types].xml', data: u8(contentTypes) });
+  zipFiles.push({ name: '_rels/.rels', data: u8(ROOT_RELS) });
+  zipFiles.push({ name: 'xl/workbook.xml', data: u8(buildWorkbookXml(sheets.map((s) => s.name))) });
+  zipFiles.push({ name: 'xl/_rels/workbook.xml.rels', data: u8(buildWorkbookRels(sheets.length)) });
+  sheets.forEach((sheet, i) => {
+    const headers = sheet.rows.length > 0 ? Object.keys(sheet.rows[0]) : [];
+    zipFiles.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: u8(buildSheetXml(sheet.rows, headers)) });
+  });
+  triggerDownload(writeZip(zipFiles), filename);
+}
+
+// ── Product exports ──────────────────────────────────────────────────────────
 
 export interface TreinteProduct {
   id: string;
@@ -192,6 +203,11 @@ export interface TreinteProduct {
   createdAt: string;
 }
 
+const PRODUCT_HEADERS = [
+  'Codigo', 'Nombre', 'Marca', 'Categoria', 'Talla',
+  'Stock', 'Precio Costo', 'Precio Venta', 'Fecha Alta',
+];
+
 function getTotalStockLocal(p: TreinteProduct): number {
   if (p.variants && p.variants.length > 0) return p.variants.reduce((s, v) => s + v.stock, 0);
   return p.stock ?? 0;
@@ -204,10 +220,10 @@ function buildProductRows(products: TreinteProduct[]): SheetData {
     if (hasV) {
       p.variants!.forEach((v) => {
         rows.push({
-          'Código': p.barcode,
+          'Codigo': p.barcode,
           'Nombre': p.name,
           'Marca': p.brand,
-          'Categoría': p.category,
+          'Categoria': p.category,
           'Talla': v.size,
           'Stock': v.stock,
           'Precio Costo': p.costPrice,
@@ -217,11 +233,11 @@ function buildProductRows(products: TreinteProduct[]): SheetData {
       });
     } else {
       rows.push({
-        'Código': p.barcode,
+        'Codigo': p.barcode,
         'Nombre': p.name,
         'Marca': p.brand,
-        'Categoría': p.category,
-        'Talla': p.size || 'Único',
+        'Categoria': p.category,
+        'Talla': p.size || 'Unico',
         'Stock': getTotalStockLocal(p),
         'Precio Costo': p.costPrice,
         'Precio Venta': p.salePrice,
@@ -232,20 +248,31 @@ function buildProductRows(products: TreinteProduct[]): SheetData {
   return rows;
 }
 
-const PRODUCT_HEADERS = [
-  'Código', 'Nombre', 'Marca', 'Categoría', 'Talla',
-  'Stock', 'Precio Costo', 'Precio Venta', 'Fecha Alta',
-];
-
-function emptyHeaderRow(): SheetData {
-  return [Object.fromEntries(PRODUCT_HEADERS.map((h) => [h, null]))];
+function buildProductXlsx(
+  sheets: { name: string; products: TreinteProduct[] }[],
+  filename: string,
+): void {
+  const zipFiles: { name: string; data: Uint8Array }[] = [];
+  let contentTypes = CONTENT_TYPES_START;
+  sheets.forEach((_, i) => {
+    contentTypes += `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`;
+  });
+  contentTypes += `</Types>`;
+  zipFiles.push({ name: '[Content_Types].xml', data: u8(contentTypes) });
+  zipFiles.push({ name: '_rels/.rels', data: u8(ROOT_RELS) });
+  zipFiles.push({ name: 'xl/workbook.xml', data: u8(buildWorkbookXml(sheets.map((s) => s.name))) });
+  zipFiles.push({ name: 'xl/_rels/workbook.xml.rels', data: u8(buildWorkbookRels(sheets.length)) });
+  sheets.forEach((sheet, i) => {
+    const rows = buildProductRows(sheet.products);
+    zipFiles.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: u8(buildSheetXml(rows, PRODUCT_HEADERS)) });
+  });
+  triggerDownload(writeZip(zipFiles), filename);
 }
 
 export function downloadPrintPendingExcel(products: TreinteProduct[]): void {
   const date = new Date().toISOString().slice(0, 10);
-  const rows = buildProductRows(products);
-  downloadXlsx(
-    [{ name: 'Para Imprimir Código', rows: rows.length > 0 ? rows : emptyHeaderRow() }],
+  buildProductXlsx(
+    [{ name: 'Para Imprimir Codigo', products }],
     `codigos-para-imprimir-${date}.xlsx`,
   );
 }
@@ -253,72 +280,13 @@ export function downloadPrintPendingExcel(products: TreinteProduct[]): void {
 export function downloadTreinteExcel(products: TreinteProduct[]): void {
   const withCode = products.filter((p) => p.needsPrintedBarcode === true);
   const withoutCode = products.filter((p) => p.needsPrintedBarcode !== true);
-  const all = [...withCode, ...withoutCode];
-
-  const toRows = (list: TreinteProduct[]) => {
-    const rows = buildProductRows(list);
-    return rows.length > 0 ? rows : emptyHeaderRow();
-  };
-
   const date = new Date().toISOString().slice(0, 10);
-  downloadXlsx(
+  buildProductXlsx(
     [
-      { name: 'Códigos Generados', rows: toRows(withCode) },
-      { name: 'Pendientes de Código', rows: toRows(withoutCode) },
-      { name: 'Base Completa (Treinta)', rows: toRows(all) },
+      { name: 'Codigos Generados', products: withCode },
+      { name: 'Pendientes de Codigo', products: withoutCode },
+      { name: 'Base Completa Treinta', products: [...withCode, ...withoutCode] },
     ],
     `treinta-inventario-${date}.xlsx`,
   );
-}
-
-export function downloadXlsx(sheets: ExportSheet[], filename: string): void {
-  const zipFiles: { name: string; data: Uint8Array }[] = [];
-
-  // [Content_Types].xml
-  let contentTypes = CONTENT_TYPES_START;
-  sheets.forEach((_, i) => {
-    contentTypes += `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`;
-  });
-  contentTypes += `</Types>`;
-  zipFiles.push({ name: '[Content_Types].xml', data: u8(contentTypes) });
-
-  // _rels/.rels
-  zipFiles.push({ name: '_rels/.rels', data: u8(ROOT_RELS) });
-
-  // xl/workbook.xml
-  zipFiles.push({ name: 'xl/workbook.xml', data: u8(buildWorkbookXml(sheets.map((s) => s.name))) });
-
-  // xl/_rels/workbook.xml.rels
-  zipFiles.push({ name: 'xl/_rels/workbook.xml.rels', data: u8(buildWorkbookRels(sheets.length)) });
-
-  // xl/worksheets/sheetN.xml
-  sheets.forEach((sheet, i) => {
-    const headers = sheet.rows.length > 0 ? Object.keys(sheet.rows[0]) : [];
-    zipFiles.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: u8(buildSheetXml(sheet.rows, headers)) });
-  });
-
-  const zipData = writeZip(zipFiles);
-  const blob = new Blob(
-    [zipData.buffer.slice(zipData.byteOffset, zipData.byteOffset + zipData.byteLength)],
-    { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-  );
-
-  // msSaveBlob for legacy Edge/IE; standard approach for everything else
-  const nav = navigator as Navigator & { msSaveBlob?: (b: Blob, n: string) => void };
-  if (nav.msSaveBlob) {
-    nav.msSaveBlob(blob, filename);
-    return;
-  }
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 100);
 }
